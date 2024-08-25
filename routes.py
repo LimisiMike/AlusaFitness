@@ -1,10 +1,10 @@
 # app/routes.py
 
 from flask import Blueprint, request, jsonify
-from app import db
-from models import User, Client, Plan, Session, Progress, Message, Payment
-from schema import ClientSchema, PaymentSchema, MessageSchema
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from .models import User, Client, Plan, Session, Progress, Message, Payment, db
+from .schema import ClientSchema, PaymentSchema, MessageSchema
+from .app import app
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -15,6 +15,8 @@ message_schema = MessageSchema()
 
 main = Blueprint('main', __name__)
 
+app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key'
+jwt = JWTManager(app)
 # Helper function to get user by email
 def get_user_by_email(email):
     return User.query.filter_by(email=email).first()
@@ -33,8 +35,8 @@ def register():
     if get_user_by_email(email):
         return jsonify({'message': 'User already exists'}), 400
 
-    hashed_password = generate_password_hash(password, method='sha256')
-    new_user = User(email=email, password_hash=hashed_password, role=role)
+    hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+    new_user = User(email=email, password=hashed_password, role=role)
     db.session.add(new_user)
     db.session.commit()
 
@@ -48,7 +50,7 @@ def login():
     password = data.get('password')
 
     user = get_user_by_email(email)
-    if user and check_password_hash(user.password_hash, password):
+    if user and check_password_hash(user.password, password):
         access_token = create_access_token(identity=user.email)
         return jsonify(access_token=access_token), 200
 
